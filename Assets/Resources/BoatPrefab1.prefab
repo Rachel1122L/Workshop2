@@ -356,6 +356,13 @@ MonoBehaviour:
     m_Bits: 8
   terrainCheckHeight: 1
   collisionBuffer: 0.5
+  enableAutoCorrection: 1
+  correctionCheckInterval: 0.5
+  maxPositionOffset: 2
+  maxRotationOffset: 15
+  correctionSpeed: 2
+  emergencyCorrectionSpeed: 5
+  stuckTimeThreshold: 3
 --- !u!114 &230336408627813984
 MonoBehaviour:
   m_ObjectHideFlags: 0
