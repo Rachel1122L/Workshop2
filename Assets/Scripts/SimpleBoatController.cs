@@ -25,6 +25,7 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
     public LayerMask terrainLayer;
     public float terrainCheckHeight = 100f;
     public float collisionBuffer = 0.5f;
+    public float stopHeight = 3f; // Height at which boat should stop
 
     [Header("Auto-Correction Settings")]
     public bool enableAutoCorrection = true;
@@ -50,7 +51,7 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
     private bool isCorrecting = false;
     private float stuckTimer = 0f;
     private bool wasMoving = false;
-
+    private Vector3 initialPosition;
     private new PhotonView photonView;
 
     void Start()
@@ -74,11 +75,15 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
             return;
         }
 
+        // Store the original position BEFORE any systems interfere
+        initialPosition = transform.position;
+
         baseRotation = transform.rotation;
         bobOffset = Random.Range(0f, 100f);
-        lastValidPosition = transform.position;
-        lastValidRotation = transform.rotation;
-        expectedPosition = transform.position;
+
+        // Use the original position, don't let systems override it initially
+        lastValidPosition = initialPosition;
+        expectedPosition = initialPosition;
         expectedRotation = transform.rotation;
 
         // Initialize last correction check
@@ -132,16 +137,22 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
             expectedRotation = transform.rotation;
         }
 
-        // Check for terrain collision
+        // Check for terrain collision - FIXED VERSION
         Vector3 potentialPosition = transform.position + transform.forward * currentSpeed * Time.deltaTime;
-        float terrainY = GetTerrainHeightAt(potentialPosition);
-        float waterY = waterHeight;
 
-        if (terrainY > waterY + collisionBuffer)
+        // Check terrain height at the potential position
+        float terrainY = GetTerrainHeightAt(potentialPosition);
+
+        // Debug information to see what's happening
+        Debug.Log($"Boat Y: {transform.position.y}, Terrain Y: {terrainY}, Stop Height: {stopHeight}");
+
+        // Stop if terrain is above our stop height threshold
+        if (terrainY > stopHeight)
         {
             currentSpeed = 0f;
             transform.position = lastValidPosition;
             expectedPosition = lastValidPosition;
+            Debug.Log("TERRAIN COLLISION: Movement stopped due to high terrain");
         }
         else
         {
@@ -149,7 +160,9 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
             lastValidPosition = transform.position;
         }
 
-        transform.position = new Vector3(transform.position.x, waterY, transform.position.z);
+        // REMOVED the line that forces Y position to waterHeight
+        // This was causing conflicts with the buoyancy system
+        // transform.position = new Vector3(transform.position.x, waterY, transform.position.z);
     }
 
     void HandleTurning()
@@ -173,9 +186,18 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
         Quaternion targetRotation = Quaternion.Euler(baseRotation.eulerAngles.x + pitch, transform.eulerAngles.y, baseRotation.eulerAngles.z + roll);
         transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, Time.deltaTime * buoyancySmooth);
 
+        // Calculate target Y position - only apply buoyancy if we're in water
         Vector3 pos = transform.position;
-        pos.y = waterHeight + bob;
-        transform.position = Vector3.Lerp(transform.position, pos, Time.deltaTime * buoyancySmooth);
+        float targetY = pos.y; // Start with current Y
+
+        // Only apply buoyancy if we're at or near water level
+        if (pos.y <= waterHeight + 1f) // Within 1 unit of water surface
+        {
+            targetY = waterHeight + bob;
+        }
+
+        pos.y = Mathf.Lerp(pos.y, targetY, Time.deltaTime * buoyancySmooth);
+        transform.position = pos;
     }
 
     void CheckForCorrection()
@@ -271,10 +293,15 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
     float GetTerrainHeightAt(Vector3 position)
     {
         RaycastHit hit;
-        if (Physics.Raycast(position + Vector3.up * terrainCheckHeight, Vector3.down, out hit, terrainCheckHeight * 2f, terrainLayer))
+        Vector3 rayStart = position + Vector3.up * terrainCheckHeight;
+
+        if (Physics.Raycast(rayStart, Vector3.down, out hit, terrainCheckHeight * 2f, terrainLayer))
         {
+            Debug.DrawLine(rayStart, hit.point, Color.red, 1f); // Visual debug
             return hit.point.y;
         }
+
+        Debug.DrawRay(rayStart, Vector3.down * terrainCheckHeight * 2f, Color.green, 1f); // Visual debug
         return Mathf.NegativeInfinity;
     }
 
@@ -311,5 +338,10 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
         Gizmos.color = Color.blue;
         Vector3 expectedForward = expectedRotation * Vector3.forward * 2f;
         Gizmos.DrawLine(expectedPosition, expectedPosition + expectedForward);
+
+        // Draw stop height plane
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireCube(new Vector3(transform.position.x, stopHeight, transform.position.z),
+                           new Vector3(10f, 0.1f, 10f));
     }
 }

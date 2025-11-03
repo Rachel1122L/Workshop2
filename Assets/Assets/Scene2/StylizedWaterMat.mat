@@ -38,7 +38,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Displacement: 0.1
+    - _Displacement: 0.05
     - _FoamAmount: 1
     - _FoamCutOff: 1
     - _FoamScale: 100
@@ -46,7 +46,7 @@ Material:
     - _QueueControl: 1
     - _QueueOffset: 0
     - _RefractionScale: 1
-    - _RefractionSpeed: 0.07
+    - _RefractionSpeed: 0.66
     - _RefractionStrength: 2
     - _WaterDepth: 20
     m_Colors:
