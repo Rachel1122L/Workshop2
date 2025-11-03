@@ -901,7 +901,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6419093672963971389}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.0021948032, y: -0.0058061546, z: -0.000012743612, w: 0.99998075}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -970,11 +970,11 @@ GameObject:
   - component: {fileID: 2750041302772863957}
   m_Layer: 6
   m_Name: BoatPrefab1
-  m_TagString: Untagged
+  m_TagString: Boat
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &9108971349152325656
 Transform:
   m_ObjectHideFlags: 0
@@ -1017,12 +1017,13 @@ MonoBehaviour:
   tiltAmount: 4
   rollAmount: 4
   buoyancySmooth: 3
-  waterHeight: 0
+  waterHeight: 2
   terrainLayer:
     serializedVersion: 2
     m_Bits: 8
-  terrainCheckHeight: 1
+  terrainCheckHeight: 3
   collisionBuffer: 0.5
+  stopHeight: 2.2
   enableAutoCorrection: 1
   correctionCheckInterval: 0.5
   maxPositionOffset: 2
@@ -1047,6 +1048,9 @@ MonoBehaviour:
   collectPromptUI: {fileID: 0}
   collectPromptText: {fileID: 0}
   collectSound: {fileID: 0}
+  collectableLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
 --- !u!114 &6924918092925186080
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -144,7 +144,7 @@ public class SimpleBoatController : MonoBehaviourPunCallbacks
         float terrainY = GetTerrainHeightAt(potentialPosition);
 
         // Debug information to see what's happening
-        Debug.Log($"Boat Y: {transform.position.y}, Terrain Y: {terrainY}, Stop Height: {stopHeight}");
+        //Debug.Log($"Boat Y: {transform.position.y}, Terrain Y: {terrainY}, Stop Height: {stopHeight}");
 
         // Stop if terrain is above our stop height threshold
         if (terrainY > stopHeight)
