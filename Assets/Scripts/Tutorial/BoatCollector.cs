@@ -95,9 +95,16 @@ public class BoatCollector : MonoBehaviourPunCallbacks
 
     private void CollectItem()
     {
+        // Only local player can collect items
+        if (!photonView.IsMine)
+        {
+            Debug.Log("Not local player, cannot collect");
+            return;
+        }
+
         if (nearbyCollectable != null && !nearbyCollectable.IsCollected)
         {
-            Debug.Log($"Attempting to collect: {nearbyCollectable.itemName}");
+            Debug.Log($"Collect key pressed. Nearby collectable: {nearbyCollectable.itemName}");
 
             // Play sound locally
             if (collectSound != null && audioSource != null)
@@ -108,8 +115,8 @@ public class BoatCollector : MonoBehaviourPunCallbacks
             // This will handle network collection
             nearbyCollectable.Collect();
 
-            // Don't clear immediately - let the collection process handle it
-            // The collection coroutine will handle clearing after successful collection
+            // Clear reference immediately
+            ClearNearbyCollectable(nearbyCollectable);
 
             // Hide prompt immediately
             if (collectPromptUI != null)

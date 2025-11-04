@@ -2,14 +2,13 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
-
 public class FloatingItem : MonoBehaviour
 {
     [Header("Float Settings")]
     public float waterHeight = 0f;
     public float bobFrequency = 1.5f;
     public float bobAmplitude = 0.15f;
-    public float rotationSpeed = 45f;
+    public float floatingSpeed = 0.5f; // Now controls vertical floating speed
 
     [Header("Collection")]
     public float collectionRadius = 1f;
@@ -18,6 +17,7 @@ public class FloatingItem : MonoBehaviour
     private Vector3 startPosition;
     private float bobOffset;
     private bool isCollected = false;
+    private float floatTimer = 0f;
 
     void Start()
     {
@@ -30,14 +30,15 @@ public class FloatingItem : MonoBehaviour
         if (isCollected)
             return;
 
-        // Apply bobbing motion
+        // Apply bobbing motion with vertical floating
         float bob = Mathf.Sin(Time.time * bobFrequency + bobOffset) * bobAmplitude;
+        floatTimer += Time.deltaTime * floatingSpeed;
+
         Vector3 pos = startPosition;
-        pos.y = waterHeight + bob;
+        pos.y = waterHeight + bob + Mathf.Sin(floatTimer) * 0.1f; // Added gentle vertical floating
         transform.position = pos;
 
-        // Gentle rotation
-        transform.Rotate(Vector3.up, rotationSpeed * Time.deltaTime);
+        // Removed rotation - items no longer rotate
     }
 
     void OnTriggerEnter(Collider other)
@@ -57,6 +58,15 @@ public class FloatingItem : MonoBehaviour
         // - Play sound effect
         // - Play particle effect
         // - Increment score
+
+        Debug.Log("Item collected by boat!");
         Destroy(gameObject);
+    }
+
+    // Optional: Visualize collection radius in editor
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, collectionRadius);
     }
 }

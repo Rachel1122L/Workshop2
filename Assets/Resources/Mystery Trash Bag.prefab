@@ -135,10 +135,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf5648c84860c1a40a5ee5cbc252ded3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  waterHeight: 0.95
-  bobFrequency: 1.5
-  bobAmplitude: 0.15
-  rotationSpeed: 1
+  waterHeight: 1
+  bobFrequency: 0.6
+  bobAmplitude: 0.1
+  floatingSpeed: 0.5
   collectionRadius: 2
   boatTag: Boat
 --- !u!114 &5204802439734923160
