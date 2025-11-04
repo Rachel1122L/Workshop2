@@ -12,13 +12,20 @@ public class CollectableItem : MonoBehaviourPunCallbacks
     [Header("Visual Feedback")]
     public Material highlightMaterial;
     public ParticleSystem collectParticles;
+    public ParticleSystem dropParticles; // NEW: Particles for dropping
 
     private Material originalMaterial;
     private Renderer objectRenderer;
     private bool isPlayerInRange = false;
+    private Vector3 originalScale; // NEW: Store original scale
 
-    // MODIFIED: Changed to public property with setter
-    public bool IsCollected { get; set; } = false;
+    // MODIFIED: Proper backing field with public property
+    private bool isCollected = false;
+    public bool IsCollected
+    {
+        get { return isCollected; }
+        set { isCollected = value; }
+    }
 
     void Start()
     {
@@ -27,6 +34,9 @@ public class CollectableItem : MonoBehaviourPunCallbacks
         {
             originalMaterial = objectRenderer.material;
         }
+
+        // NEW: Store original scale
+        originalScale = transform.localScale;
 
         if (GetComponent<Collider>() == null)
         {
@@ -44,7 +54,7 @@ public class CollectableItem : MonoBehaviourPunCallbacks
 
     void Update()
     {
-        if (!IsCollected)
+        if (!IsCollected && gameObject.activeInHierarchy)
         {
             transform.Rotate(0, 30 * Time.deltaTime, 0);
         }
@@ -88,7 +98,7 @@ public class CollectableItem : MonoBehaviourPunCallbacks
         }
     }
 
-    // MODIFIED: Removed automatic destruction - now handled by BoatCollector
+    // MODIFIED: Collection method
     public void Collect()
     {
         if (IsCollected) return;
@@ -126,8 +136,63 @@ public class CollectableItem : MonoBehaviourPunCallbacks
 
         HighlightObject(false);
 
-        // MODIFIED: Don't destroy here - let BoatCollector handle hiding
+        // Hide the object (BoatCollector will handle showing it again when dropped)
+        gameObject.SetActive(false);
+
         Debug.Log($"Collected: {itemName} (+{scoreValue} points)");
+    }
+
+    // NEW: Drop method for when trash is dropped at recycle bin
+    public void DropAtRecycleBin(Vector3 dropPosition)
+    {
+        // Reset collected state
+        IsCollected = false;
+        isPlayerInRange = false;
+
+        // Show the object
+        gameObject.SetActive(true);
+
+        // Set position at recycle bin
+        transform.position = dropPosition;
+
+        // Reset scale and rotation
+        transform.localScale = originalScale;
+        transform.rotation = Quaternion.identity;
+
+        // Stop any highlight effects
+        HighlightObject(false);
+        StopPulsatingEffect();
+
+        // Play drop particles if available
+        if (dropParticles != null)
+        {
+            ParticleSystem particles = Instantiate(dropParticles, transform.position, Quaternion.identity);
+            particles.Play();
+            Destroy(particles.gameObject, 2f);
+        }
+
+        // NEW: Optional - add some random rotation for visual variety
+        StartCoroutine(ApplyRandomRotation());
+
+        Debug.Log($"Dropped {itemName} at recycle bin");
+    }
+
+    // NEW: Coroutine for random rotation after dropping
+    private IEnumerator ApplyRandomRotation()
+    {
+        float randomRotation = Random.Range(0f, 360f);
+        transform.rotation = Quaternion.Euler(0, randomRotation, 0);
+        yield return null;
+    }
+
+    // NEW: Reset method for item reuse
+    public void ResetItem()
+    {
+        IsCollected = false;
+        isPlayerInRange = false;
+        HighlightObject(false);
+        StopPulsatingEffect();
+        transform.localScale = originalScale;
     }
 
     private void HighlightObject(bool highlight)
@@ -154,29 +219,55 @@ public class CollectableItem : MonoBehaviourPunCallbacks
 
     private void StartPulsatingEffect()
     {
-        StartCoroutine(PulsateEffect());
+        if (!IsCollected)
+        {
+            StartCoroutine(PulsateEffect());
+        }
     }
 
     private void StopPulsatingEffect()
     {
         StopAllCoroutines();
-        transform.localScale = Vector3.one;
+        if (transform != null)
+        {
+            transform.localScale = originalScale;
+        }
     }
 
-    private System.Collections.IEnumerator PulsateEffect()
+    private IEnumerator PulsateEffect()
     {
         float pulseSpeed = 2f;
         float pulseIntensity = 0.2f;
-        Vector3 originalScale = transform.localScale;
 
-        while (isPlayerInRange && !IsCollected)
+        while (isPlayerInRange && !IsCollected && gameObject.activeInHierarchy)
         {
             float pulse = Mathf.Sin(Time.time * pulseSpeed) * pulseIntensity;
             transform.localScale = originalScale * (1 + pulse);
             yield return null;
         }
 
-        transform.localScale = originalScale;
+        // Reset scale when done
+        if (transform != null)
+        {
+            transform.localScale = originalScale;
+        }
+    }
+
+    // NEW: Handle object states properly
+    void OnEnable()
+    {
+        // Reset item when it's enabled again
+        if (IsCollected)
+        {
+            ResetItem();
+        }
+    }
+
+    void OnDisable()
+    {
+        // Clean up when disabled
+        StopPulsatingEffect();
+        isPlayerInRange = false;
     }
 
     void OnDrawGizmosSelected()
