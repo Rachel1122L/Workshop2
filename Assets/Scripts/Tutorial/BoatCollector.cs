@@ -23,7 +23,7 @@ public class BoatCollector : MonoBehaviourPunCallbacks
     public int maxInventorySize = 5;
 
     public CollectableItem nearbyCollectable;
-    private bool nearRecycleBin = false;
+    public bool nearRecycleBin = false;
     private GameObject currentRecycleBin;
     private AudioSource audioSource;
     private bool isInitialized = false;
