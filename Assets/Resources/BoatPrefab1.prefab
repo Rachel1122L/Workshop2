@@ -1045,12 +1045,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   collectionRange: 10
   collectKey: 101
+  dropKey: 113
   collectPromptUI: {fileID: 0}
   collectPromptText: {fileID: 0}
+  inventoryText: {fileID: 0}
   collectSound: {fileID: 0}
+<<<<<<< Updated upstream
   collectableLayerMask:
     serializedVersion: 2
     m_Bits: 1
+=======
+  dropSound: {fileID: 0}
+  trashInventory: []
+  maxInventorySize: 5
+  nearbyCollectable: {fileID: 0}
+  nearRecycleBin: 0
+>>>>>>> Stashed changes
 --- !u!114 &6924918092925186080
 MonoBehaviour:
   m_ObjectHideFlags: 0
