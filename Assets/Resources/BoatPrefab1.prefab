@@ -1046,7 +1046,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerCameraPrefab: {fileID: 1763645731239891632, guid: ff01299df938d97418671ccfe3170ae7,
     type: 3}
-  cameraPositionOffset: {x: 0, y: 2, z: -5}
+  cameraPositionOffset: {x: 0, y: 0, z: 0}
   fieldOfView: 60
 --- !u!114 &230336408627813984
 MonoBehaviour:

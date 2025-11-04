@@ -31,11 +31,14 @@ public class MultiplayerCameraManager : MonoBehaviourPunCallbacks
             playerVirtualCamera.LookAt = transform;
             playerVirtualCamera.m_Lens.FieldOfView = fieldOfView;
 
+            // REMOVE or COMMENT OUT this section to preserve inspector settings
+            /*
             var transposer = playerVirtualCamera.GetCinemachineComponent<CinemachineTransposer>();
             if (transposer != null)
             {
                 transposer.m_FollowOffset = cameraPositionOffset;
             }
+            */
         }
 
         SetupAudioListener();
