@@ -17,6 +17,195 @@ public class CollectableItem : MonoBehaviourPunCallbacks
     private Renderer objectRenderer;
     private bool isPlayerInRange = false;
 
+    // MODIFIED: Changed to public property with setter
+    public bool IsCollected { get; set; } = false;
+
+    void Start()
+    {
+        objectRenderer = GetComponent<Renderer>();
+        if (objectRenderer != null)
+        {
+            originalMaterial = objectRenderer.material;
+        }
+
+        if (GetComponent<Collider>() == null)
+        {
+            SphereCollider collider = gameObject.AddComponent<SphereCollider>();
+            collider.isTrigger = true;
+            collider.radius = collectRange;
+        }
+
+        // Add Collectable tag if not present
+        if (!gameObject.CompareTag("Collectable"))
+        {
+            gameObject.tag = "Collectable";
+        }
+    }
+
+    void Update()
+    {
+        if (!IsCollected)
+        {
+            transform.Rotate(0, 30 * Time.deltaTime, 0);
+        }
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Player") && !IsCollected)
+        {
+            PhotonView photonView = other.GetComponent<PhotonView>();
+            if (photonView != null && !photonView.IsMine)
+                return;
+
+            isPlayerInRange = true;
+            HighlightObject(true);
+
+            BoatCollector collector = other.GetComponent<BoatCollector>();
+            if (collector != null)
+            {
+                collector.SetNearbyCollectable(this);
+            }
+        }
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            PhotonView photonView = other.GetComponent<PhotonView>();
+            if (photonView != null && !photonView.IsMine)
+                return;
+
+            isPlayerInRange = false;
+            HighlightObject(false);
+
+            BoatCollector collector = other.GetComponent<BoatCollector>();
+            if (collector != null)
+            {
+                collector.ClearNearbyCollectable(this);
+            }
+        }
+    }
+
+    // MODIFIED: Removed automatic destruction - now handled by BoatCollector
+    public void Collect()
+    {
+        if (IsCollected) return;
+
+        if (PhotonNetwork.IsConnected && !photonView.IsMine)
+            return;
+
+        IsCollected = true;
+
+        // Visual effects
+        if (collectParticles != null)
+        {
+            ParticleSystem particles = Instantiate(collectParticles, transform.position, Quaternion.identity);
+            particles.Play();
+            Destroy(particles.gameObject, 2f);
+        }
+
+        // Notify game manager
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.AddScore(scoreValue);
+            GameManager.Instance.AddCollectedItem(itemName);
+        }
+
+        // Clear from boat collector
+        if (isPlayerInRange)
+        {
+            BoatCollector collector = FindObjectOfType<BoatCollector>();
+            if (collector != null)
+            {
+                collector.ClearNearbyCollectable(this);
+            }
+            isPlayerInRange = false;
+        }
+
+        HighlightObject(false);
+
+        // MODIFIED: Don't destroy here - let BoatCollector handle hiding
+        Debug.Log($"Collected: {itemName} (+{scoreValue} points)");
+    }
+
+    private void HighlightObject(bool highlight)
+    {
+        if (objectRenderer == null) return;
+
+        if (highlight)
+        {
+            if (highlightMaterial != null)
+            {
+                objectRenderer.material = highlightMaterial;
+            }
+            StartPulsatingEffect();
+        }
+        else
+        {
+            if (originalMaterial != null)
+            {
+                objectRenderer.material = originalMaterial;
+            }
+            StopPulsatingEffect();
+        }
+    }
+
+    private void StartPulsatingEffect()
+    {
+        StartCoroutine(PulsateEffect());
+    }
+
+    private void StopPulsatingEffect()
+    {
+        StopAllCoroutines();
+        transform.localScale = Vector3.one;
+    }
+
+    private System.Collections.IEnumerator PulsateEffect()
+    {
+        float pulseSpeed = 2f;
+        float pulseIntensity = 0.2f;
+        Vector3 originalScale = transform.localScale;
+
+        while (isPlayerInRange && !IsCollected)
+        {
+            float pulse = Mathf.Sin(Time.time * pulseSpeed) * pulseIntensity;
+            transform.localScale = originalScale * (1 + pulse);
+            yield return null;
+        }
+
+        transform.localScale = originalScale;
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(transform.position, collectRange);
+    }
+}
+
+// Original Code//
+/*using UnityEngine;
+using System.Collections;
+using Photon.Pun;
+
+public class CollectableItem : MonoBehaviourPunCallbacks
+{
+    [Header("Collectable Settings")]
+    public string itemName = "Trash";
+    public int scoreValue = 10;
+    public float collectRange = 3f;
+
+    [Header("Visual Feedback")]
+    public Material highlightMaterial;
+    public ParticleSystem collectParticles;
+
+    private Material originalMaterial;
+    private Renderer objectRenderer;
+    private bool isPlayerInRange = false;
+
     // Private field with public property
     private bool isCollected = false;
     public bool IsCollected => isCollected;
@@ -213,4 +402,4 @@ public class CollectableItem : MonoBehaviourPunCallbacks
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, collectRange);
     }
-}
+}*/

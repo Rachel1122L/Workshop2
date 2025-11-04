@@ -5,6 +5,8 @@ TagManager:
   serializedVersion: 2
   tags:
   - Land
+  - RecycleBin
+  - Collectable
   layers:
   - Default
   - TransparentFX
