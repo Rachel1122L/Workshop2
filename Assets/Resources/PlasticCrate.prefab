@@ -166,7 +166,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   itemName: PlasticCrate
-  itemValue: 1
+  itemValue: 2
 --- !u!114 &7110268471348193433
 MonoBehaviour:
   m_ObjectHideFlags: 0
