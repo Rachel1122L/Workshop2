@@ -286,7 +286,7 @@ public class GameManager : MonoBehaviourPunCallbacks
 
         if (Input.GetKeyDown(KeyCode.T))
         {
-            AddScore(10);
+            AddScore(1);
             GameObject testItem = new GameObject("TestItem");
             CollectableItem collectable = testItem.AddComponent<CollectableItem>();
             collectable.itemName = "TestItem";

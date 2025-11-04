@@ -10,8 +10,23 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
+      propertyPath: m_LocalScale.x
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
+        type: 3}
+      propertyPath: m_LocalScale.y
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
+        type: 3}
+      propertyPath: m_LocalScale.z
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
+        type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.0904331
+      value: -9.67
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
@@ -21,17 +36,17 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 18.881725
+      value: 20.76
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.7071067
+      value: 0.36743876
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
       propertyPath: m_LocalRotation.x
-      value: -0.7071068
+      value: -0.93004775
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
@@ -46,7 +61,7 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
+      value: -136.884
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
@@ -57,6 +72,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
+        type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: a7cd4c03be2ff434bb9c958c1bb8156c,
         type: 3}
@@ -127,10 +147,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf5648c84860c1a40a5ee5cbc252ded3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  waterHeight: 0
+  waterHeight: 1.1
   bobFrequency: 1.5
-  bobAmplitude: 0.15
-  rotationSpeed: 45
+  bobAmplitude: 0.4
+  floatingSpeed: 0.5
   collectionRadius: 1
   boatTag: Boat
 --- !u!114 &4614311796149994757
