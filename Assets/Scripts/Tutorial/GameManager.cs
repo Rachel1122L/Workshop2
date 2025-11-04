@@ -3,18 +3,18 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine.SceneManagement;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
     public static GameManager Instance;
 
-    [Header("Game Stats")]
-    public int totalScore = 0;
-    public List<CollectableItem> collectedItems = new List<CollectableItem>();
-
     [Header("UI References")]
     public Text scoreText;
     public Text itemsText;
+    public GameObject scoreboardPanel;
+    public Text scoreboardText;
 
     [Header("Multiplayer Setup")]
     public GameObject playerPrefab;
@@ -22,6 +22,10 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     [Header("Collectable Prefab References")]
     public GameObject[] collectablePrefabs;
+
+    // Player-specific data - each player manages their own
+    private int localPlayerScore = 0;
+    private List<string> localCollectedItems = new List<string>();
 
     void Awake()
     {
@@ -55,11 +59,29 @@ public class GameManager : MonoBehaviourPunCallbacks
         Debug.Log("Setting up multiplayer...");
         Debug.Log($"In room: {PhotonNetwork.CurrentRoom.Name} with {PhotonNetwork.CurrentRoom.PlayerCount} players");
 
+        // Initialize player properties for THIS player only
+        InitializePlayerProperties();
+
         // Setup camera
         SetupCamera();
 
         // Spawn player
         SpawnPlayer();
+    }
+
+    private void InitializePlayerProperties()
+    {
+        // Set initial score for THIS player only
+        Hashtable initialProps = new Hashtable();
+        initialProps["Score"] = 0;
+        initialProps["ItemsCount"] = 0;
+        initialProps["PlayerName"] = PhotonNetwork.LocalPlayer.NickName;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(initialProps);
+
+        localPlayerScore = 0;
+        localCollectedItems.Clear();
+
+        Debug.Log($"Initialized properties for player: {PhotonNetwork.LocalPlayer.NickName}");
     }
 
     private void SetupCamera()
@@ -105,6 +127,11 @@ public class GameManager : MonoBehaviourPunCallbacks
                 if (player.GetComponent<PhotonView>().IsMine)
                 {
                     SetupPlayerCamera(player);
+
+                    // Initialize this player's score UI
+                    localPlayerScore = 0;
+                    localCollectedItems.Clear();
+                    UpdateUI();
                 }
             }
             else
@@ -150,44 +177,83 @@ public class GameManager : MonoBehaviourPunCallbacks
         }
     }
 
-    public void AddScore(int points)
+    // Call this method when a player collects something
+    public void AddScore(int points, string itemName = "")
     {
-        totalScore += points;
-        UpdateUI();
+        // Only update for the local player
+        if (!PhotonNetwork.LocalPlayer.IsLocal) return;
 
-        if (PhotonNetwork.InRoom)
+        localPlayerScore += points;
+
+        if (!string.IsNullOrEmpty(itemName))
         {
-            Debug.Log($"Score updated: {totalScore}");
+            localCollectedItems.Add(itemName);
         }
-    }
 
-    public void AddCollectedItem(CollectableItem item)
-    {
-        collectedItems.Add(item);
+        // Update custom properties for this player only
+        Hashtable props = new Hashtable();
+        props["Score"] = localPlayerScore;
+        props["ItemsCount"] = localCollectedItems.Count;
+        props["PlayerName"] = PhotonNetwork.LocalPlayer.NickName;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+
         UpdateUI();
+        UpdateScoreboard();
 
-        if (PhotonNetwork.InRoom)
-        {
-            Debug.Log($"Item collected: {item.itemName}");
-        }
-    }
-
-    public void RemoveCollectedItem(CollectableItem item)
-    {
-        collectedItems.Remove(item);
-        UpdateUI();
+        Debug.Log($"{PhotonNetwork.LocalPlayer.NickName} score: {localPlayerScore}, items: {localCollectedItems.Count}");
     }
 
     private void UpdateUI()
     {
+        // Only update UI for local player
+        if (!PhotonNetwork.LocalPlayer.IsLocal) return;
+
         if (scoreText != null)
         {
-            scoreText.text = $"Score: {totalScore}";
+            scoreText.text = $"Score: {localPlayerScore}";
         }
 
         if (itemsText != null)
         {
-            itemsText.text = $"Items: {collectedItems.Count}";
+            itemsText.text = $"Items: {localCollectedItems.Count}";
+        }
+    }
+
+    private void UpdateScoreboard()
+    {
+        if (scoreboardText != null && PhotonNetwork.InRoom)
+        {
+            string scoreboard = "SCOREBOARD:\n";
+
+            foreach (Player player in PhotonNetwork.PlayerList)
+            {
+                int playerScore = player.CustomProperties.ContainsKey("Score") ? (int)player.CustomProperties["Score"] : 0;
+                int playerItems = player.CustomProperties.ContainsKey("ItemsCount") ? (int)player.CustomProperties["ItemsCount"] : 0;
+                string playerName = player.CustomProperties.ContainsKey("PlayerName") ? (string)player.CustomProperties["PlayerName"] : player.NickName;
+
+                if (player.IsLocal)
+                {
+                    scoreboard += $"<b>{playerName} (You): {playerScore} pts, {playerItems} items</b>\n";
+                }
+                else
+                {
+                    scoreboard += $"{playerName}: {playerScore} pts, {playerItems} items\n";
+                }
+            }
+
+            scoreboardText.text = scoreboard;
+        }
+    }
+
+    public void ToggleScoreboard()
+    {
+        if (scoreboardPanel != null)
+        {
+            scoreboardPanel.SetActive(!scoreboardPanel.activeSelf);
+            if (scoreboardPanel.activeSelf)
+            {
+                UpdateScoreboard();
+            }
         }
     }
 
@@ -195,6 +261,10 @@ public class GameManager : MonoBehaviourPunCallbacks
     public override void OnJoinedRoom()
     {
         Debug.Log("GameManager: Joined room successfully");
+
+        // Reset local player data when joining a new room
+        localPlayerScore = 0;
+        localCollectedItems.Clear();
 
         if (SceneManager.GetActiveScene().name == "GameScene")
         {
@@ -206,14 +276,31 @@ public class GameManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("Left room, returning to lobby...");
 
-        totalScore = 0;
-        collectedItems.Clear();
+        localPlayerScore = 0;
+        localCollectedItems.Clear();
         UpdateUI();
 
         SceneManager.LoadScene("Lobby");
     }
 
-    // FIXED: Use public access modifiers for overrides
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        // When any player updates their score, refresh the scoreboard
+        UpdateScoreboard();
+    }
+
+    public override void OnPlayerEnteredRoom(Player newPlayer)
+    {
+        Debug.Log($"Player joined: {newPlayer.NickName}");
+        UpdateScoreboard();
+    }
+
+    public override void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        Debug.Log($"Player left: {otherPlayer.NickName}");
+        UpdateScoreboard();
+    }
+
     public override void OnEnable()
     {
         base.OnEnable();
@@ -232,9 +319,13 @@ public class GameManager : MonoBehaviourPunCallbacks
 
         FindUIReferences();
         UpdateUI();
+        UpdateScoreboard();
 
         if (PhotonNetwork.InRoom && scene.name == "GameScene")
         {
+            // Reset local player data on scene load
+            localPlayerScore = 0;
+            localCollectedItems.Clear();
             Invoke(nameof(SetupMultiplayer), 0.1f);
         }
     }
@@ -243,36 +334,15 @@ public class GameManager : MonoBehaviourPunCallbacks
     {
         GameObject scoreObj = GameObject.Find("ScoreText");
         GameObject itemsObj = GameObject.Find("ItemsText");
+        GameObject scoreboardObj = GameObject.Find("ScoreboardPanel");
+        GameObject scoreboardTextObj = GameObject.Find("ScoreboardText");
 
         if (scoreObj != null) scoreText = scoreObj.GetComponent<Text>();
         if (itemsObj != null) itemsText = itemsObj.GetComponent<Text>();
+        if (scoreboardObj != null) scoreboardPanel = scoreboardObj;
+        if (scoreboardTextObj != null) scoreboardText = scoreboardTextObj.GetComponent<Text>();
 
         Debug.Log($"UI References - Score: {scoreText != null}, Items: {itemsText != null}");
-    }
-
-    public GameObject GetCollectablePrefab(string prefabName)
-    {
-        foreach (GameObject prefab in collectablePrefabs)
-        {
-            if (prefab.name == prefabName)
-            {
-                return prefab;
-            }
-        }
-        Debug.LogWarning($"Collectable prefab not found: {prefabName}");
-        return null;
-    }
-
-    public void SpawnCollectable(string prefabName, Vector3 position)
-    {
-        if (PhotonNetwork.IsMasterClient)
-        {
-            GameObject prefab = GetCollectablePrefab(prefabName);
-            if (prefab != null)
-            {
-                PhotonNetwork.Instantiate(prefab.name, position, Quaternion.identity);
-            }
-        }
     }
 
     // Debug method for testing
@@ -284,24 +354,31 @@ public class GameManager : MonoBehaviourPunCallbacks
             SpawnPlayer();
         }
 
-        if (Input.GetKeyDown(KeyCode.T))
+        if (Input.GetKeyDown(KeyCode.T) && PhotonNetwork.LocalPlayer.IsLocal)
         {
-            AddScore(1);
-            GameObject testItem = new GameObject("TestItem");
-            CollectableItem collectable = testItem.AddComponent<CollectableItem>();
-            collectable.itemName = "TestItem";
-            AddCollectedItem(collectable);
-            Destroy(testItem);
+            AddScore(1, "TestItem");
+            Debug.Log($"Local player score: {localPlayerScore}");
+        }
+
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            ToggleScoreboard();
         }
     }
 
-    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+    // Public getters for other scripts to access local player data
+    public int GetLocalPlayerScore()
     {
-        Debug.Log($"Player joined: {newPlayer.NickName}");
+        return localPlayerScore;
     }
 
-    public override void OnPlayerLeftRoom(Photon.Realtime.Player otherPlayer)
+    public int GetLocalPlayerItemsCount()
     {
-        Debug.Log($"Player left: {otherPlayer.NickName}");
+        return localCollectedItems.Count;
+    }
+
+    public string GetLocalPlayerName()
+    {
+        return PhotonNetwork.LocalPlayer.NickName;
     }
 }

@@ -143,11 +143,10 @@ public class CollectableItem : MonoBehaviourPunCallbacks
         isCollected = true;
         UpdateVisualState();
 
-        // Notify GameManager
+        // CHANGED: Use the new AddScore method instead of AddCollectedItem
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.AddCollectedItem(this);
-            GameManager.Instance.AddScore(itemValue);
+            GameManager.Instance.AddScore(itemValue, itemName);
         }
         else
         {
@@ -181,10 +180,10 @@ public class CollectableItem : MonoBehaviourPunCallbacks
         isCollected = true;
         UpdateVisualState();
 
+        // CHANGED: Use the new AddScore method instead of AddCollectedItem
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.AddCollectedItem(this);
-            GameManager.Instance.AddScore(itemValue);
+            GameManager.Instance.AddScore(itemValue, itemName);
         }
 
         Destroy(gameObject, 0.1f);
