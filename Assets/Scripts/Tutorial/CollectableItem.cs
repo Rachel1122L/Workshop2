@@ -1,6 +1,5 @@
 using UnityEngine;
 using Photon.Pun;
-using Photon.Realtime;
 using System.Collections;
 
 public class CollectableItem : MonoBehaviourPunCallbacks
@@ -14,14 +13,12 @@ public class CollectableItem : MonoBehaviourPunCallbacks
 
     private Collider itemCollider;
     private Renderer itemRenderer;
-    private bool photonComponentsInitialized = false;
 
     void Awake()
     {
         itemCollider = GetComponent<Collider>();
         itemRenderer = GetComponent<Renderer>();
 
-        // Ensure collider is trigger
         if (itemCollider != null && !itemCollider.isTrigger)
         {
             itemCollider.isTrigger = true;
@@ -30,157 +27,75 @@ public class CollectableItem : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        InitializePhotonComponents();
-
-        if (CollectableNetworkManager.Instance != null)
-        {
-            CollectableNetworkManager.Instance.RegisterSceneCollectable(this);
-        }
-
         UpdateVisualState();
-    }
-
-    private void InitializePhotonComponents()
-    {
-        if (photonComponentsInitialized) return;
-
-        if (PhotonNetwork.IsConnected)
-        {
-            PhotonView pv = GetComponent<PhotonView>();
-            if (pv == null)
-            {
-                pv = gameObject.AddComponent<PhotonView>();
-                pv.OwnershipTransfer = OwnershipOption.Takeover;
-                pv.Synchronization = ViewSynchronization.UnreliableOnChange;
-
-                // Assign a view ID if needed (for instantiated objects)
-                if (pv.ViewID == 0)
-                {
-                    pv.ViewID = PhotonNetwork.AllocateViewID(false);
-                }
-            }
-
-            PhotonTransformViewClassic ptv = GetComponent<PhotonTransformViewClassic>();
-            if (ptv == null)
-            {
-                ptv = gameObject.AddComponent<PhotonTransformViewClassic>();
-            }
-
-            if (pv.ObservedComponents == null || pv.ObservedComponents.Count == 0)
-            {
-                pv.ObservedComponents = new System.Collections.Generic.List<Component> { ptv };
-            }
-            else if (!pv.ObservedComponents.Contains(ptv))
-            {
-                pv.ObservedComponents.Add(ptv);
-            }
-
-            Debug.Log($"Photon components initialized for {itemName}. ViewID: {pv.ViewID}");
-        }
-
-        photonComponentsInitialized = true;
     }
 
     public void Collect()
     {
-        if (IsCollected)
-        {
-            Debug.Log($"{itemName} already collected, ignoring collect request");
-            return;
-        }
+        if (IsCollected) return;
 
-        Debug.Log($"Collect called for {itemName}. Network: {PhotonNetwork.IsConnected}");
+        Debug.Log($"Collect called for {itemName} by player {PhotonNetwork.LocalPlayer.ActorNumber}");
 
         if (PhotonNetwork.IsConnected)
         {
-            // Double-check photon components
-            if (photonView == null || photonView.ViewID == 0)
-            {
-                Debug.LogError($"PhotonView not properly initialized for {itemName}! Falling back to local collection.");
-                LocalCollect();
-                return;
-            }
-
-            // Request ownership then collect
-            photonView.RequestOwnership();
-            StartCoroutine(CollectAfterOwnership());
+            // Simple RPC call - no ownership transfer needed
+            photonView.RPC("RPC_CollectItem", RpcTarget.AllBuffered, PhotonNetwork.LocalPlayer.ActorNumber);
         }
         else
         {
-            LocalCollect();
-        }
-    }
-
-    private IEnumerator CollectAfterOwnership()
-    {
-        // Wait for ownership transfer
-        yield return new WaitForSeconds(0.1f);
-
-        if (photonView != null && photonView.ViewID != 0)
-        {
-            Debug.Log($"Calling RPC_CollectItem for {itemName}. ViewID: {photonView.ViewID}, IsMine: {photonView.IsMine}");
-            photonView.RPC("RPC_CollectItem", RpcTarget.AllBuffered);
-        }
-        else
-        {
-            Debug.LogError($"Cannot call RPC - PhotonView invalid for {itemName}. ViewID: {photonView?.ViewID}");
-            // Fallback to local collection
             LocalCollect();
         }
     }
 
     [PunRPC]
-    void RPC_CollectItem()
+    void RPC_CollectItem(int collectingPlayerId)
     {
-        if (IsCollected)
-        {
-            Debug.Log($"{itemName} already collected in RPC");
-            return;
-        }
+        if (IsCollected) return;
 
-        Debug.Log($"RPC_CollectItem executed for {itemName}");
+        Debug.Log($"RPC_CollectItem: {itemName} collected by player {collectingPlayerId}");
 
         isCollected = true;
         UpdateVisualState();
 
-        // CHANGED: Use the new AddScore method instead of AddCollectedItem
-        if (GameManager.Instance != null)
+        // Only the player who collected it adds to their score
+        if (PhotonNetwork.LocalPlayer.ActorNumber == collectingPlayerId)
         {
-            GameManager.Instance.AddScore(itemValue, itemName);
-        }
-        else
-        {
-            Debug.LogWarning("GameManager instance not found!");
+            Debug.Log($"Adding score to local player for {itemName}");
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.AddScore(itemValue, itemName);
+            }
         }
 
-        // Only master client destroys the object after a delay
-        if (PhotonNetwork.IsMasterClient)
-        {
-            StartCoroutine(DestroyAfterDelay(2f));
-        }
-        else
-        {
-            Debug.Log("Not master client, waiting for master to destroy object");
-        }
+        // All clients hide the item
+        StartCoroutine(HideAndDestroyItem());
     }
 
-    private IEnumerator DestroyAfterDelay(float delay)
+    private IEnumerator HideAndDestroyItem()
     {
-        yield return new WaitForSeconds(delay);
-        if (photonView != null && PhotonNetwork.IsMasterClient && gameObject != null)
+        // Hide immediately
+        UpdateVisualState();
+
+        yield return new WaitForSeconds(0.1f);
+
+        // Only master client destroys the network object
+        if (PhotonNetwork.IsMasterClient && photonView != null)
         {
-            Debug.Log($"Master client destroying {itemName}");
             PhotonNetwork.Destroy(gameObject);
+        }
+        else
+        {
+            // Non-master clients just disable it
+            gameObject.SetActive(false);
         }
     }
 
     private void LocalCollect()
     {
-        Debug.Log($"Local collect for {itemName}");
         isCollected = true;
         UpdateVisualState();
 
-        // CHANGED: Use the new AddScore method instead of AddCollectedItem
         if (GameManager.Instance != null)
         {
             GameManager.Instance.AddScore(itemValue, itemName);
@@ -202,36 +117,20 @@ public class CollectableItem : MonoBehaviourPunCallbacks
         if (IsCollected) return;
 
         BoatCollector boatCollector = other.GetComponent<BoatCollector>();
-        if (boatCollector != null)
+        if (boatCollector != null && boatCollector.photonView.IsMine)
         {
-            Debug.Log($"Trigger entered with boat: {other.gameObject.name}. Boat is mine: {boatCollector.photonView.IsMine}");
             boatCollector.SetNearbyCollectable(this);
         }
     }
 
     private void OnTriggerExit(Collider other)
     {
+        if (IsCollected) return;
+
         BoatCollector boatCollector = other.GetComponent<BoatCollector>();
-        if (boatCollector != null)
+        if (boatCollector != null && boatCollector.photonView.IsMine)
         {
-            Debug.Log($"Trigger exited with boat: {other.gameObject.name}");
             boatCollector.ClearNearbyCollectable(this);
         }
     }
-
-    // Called when the object is instantiated via Photon
-    public void OnPhotonInstantiate(PhotonMessageInfo info)
-    {
-        Debug.Log($"CollectableItem {itemName} instantiated via Photon. ViewID: {photonView.ViewID}");
-        InitializePhotonComponents();
-    }
-
-#if UNITY_EDITOR
-    [ContextMenu("Setup Photon Components")]
-    private void SetupPhotonComponents()
-    {
-        InitializePhotonComponents();
-        UnityEditor.EditorUtility.SetDirty(this);
-    }
-#endif
 }
