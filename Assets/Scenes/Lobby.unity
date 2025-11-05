@@ -1176,6 +1176,7 @@ GameObject:
   - component: {fileID: 768404081}
   - component: {fileID: 768404084}
   - component: {fileID: 768404083}
+  - component: {fileID: 768404085}
   - component: {fileID: 768404082}
   m_Layer: 5
   m_Name: Room
@@ -1286,6 +1287,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 768404080}
   m_CullTransparentMesh: 1
+--- !u!114 &768404085
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768404080}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b32e30805e467514491d2645f152c346, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &826193586
 GameObject:
   m_ObjectHideFlags: 0
