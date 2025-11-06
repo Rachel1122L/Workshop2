@@ -27,6 +27,7 @@ public class WaitingRoomManager : MonoBehaviourPunCallbacks
     private Dictionary<Player, string> playerTeams = new Dictionary<Player, string>();
     private string localPlayerTeam = "";
     private PhotonView photonViewComponent;
+    private bool isChangingScene = false; // Track if we're changing scenes
 
     void Start()
     {
@@ -37,6 +38,9 @@ public class WaitingRoomManager : MonoBehaviourPunCallbacks
             Debug.LogError("PhotonView component not found on this GameObject!");
             return;
         }
+
+        // Enable scene synchronization for all clients
+        PhotonNetwork.AutomaticallySyncScene = true;
 
         InitializeUI();
         UpdateRoomInfo();
@@ -242,7 +246,11 @@ public class WaitingRoomManager : MonoBehaviourPunCallbacks
 
         PhotonNetwork.CurrentRoom.SetCustomProperties(teamProperties);
 
-        // Load game scene for all players
+        Debug.Log("Host is starting the game for all players...");
+        isChangingScene = true; // Set flag to indicate we're changing scenes
+
+        // Use PhotonNetwork.LoadLevel to load the scene for all players in the room
+        // This will automatically load the same scene for all clients
         PhotonNetwork.LoadLevel("GameScene1");
     }
 
@@ -301,7 +309,11 @@ public class WaitingRoomManager : MonoBehaviourPunCallbacks
 
     public override void OnLeftRoom()
     {
-        SceneManager.LoadScene("Lobby");
+        // Only load lobby if we intentionally left the room (not changing scenes)
+        if (!isChangingScene)
+        {
+            SceneManager.LoadScene("Lobby");
+        }
     }
 
     // Debug method to force team sync (can be called from a button if needed)

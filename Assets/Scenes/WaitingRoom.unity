@@ -1554,8 +1554,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: -451, y: -237.02}
-  m_SizeDelta: {x: 495.6285, y: 109.1933}
+  m_AnchoredPosition: {x: -264.8181, y: -237.02002}
+  m_SizeDelta: {x: 867.9922, y: 109.19}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1683632123
 CanvasRenderer:
@@ -1598,7 +1598,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: RoomID
+  m_Text: 'RoomID : '
 --- !u!1 &1733327694
 GameObject:
   m_ObjectHideFlags: 0
