@@ -1051,15 +1051,21 @@ MonoBehaviour:
   inventoryText: {fileID: 0}
   collectSound: {fileID: 0}
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   collectableLayerMask:
     serializedVersion: 2
     m_Bits: 1
 =======
+=======
+>>>>>>> Stashed changes
   dropSound: {fileID: 0}
   trashInventory: []
   maxInventorySize: 5
   nearbyCollectable: {fileID: 0}
   nearRecycleBin: 0
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 --- !u!114 &6924918092925186080
 MonoBehaviour:
