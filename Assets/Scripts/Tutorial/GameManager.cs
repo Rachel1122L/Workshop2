@@ -3,18 +3,18 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine.SceneManagement;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
     public static GameManager Instance;
 
-    [Header("Game Stats")]
-    public int totalScore = 0;
-    public List<string> collectedItems = new List<string>();
-
     [Header("UI References")]
     public Text scoreText;
     public Text itemsText;
+    public GameObject scoreboardPanel;
+    public Text scoreboardText;
 
     [Header("Multiplayer Setup")]
     public GameObject playerPrefab;
@@ -52,11 +52,25 @@ public class GameManager : MonoBehaviourPunCallbacks
         Debug.Log("Setting up multiplayer...");
         Debug.Log($"In room: {PhotonNetwork.CurrentRoom.Name} with {PhotonNetwork.CurrentRoom.PlayerCount} players");
 
+        // Initialize player properties for THIS player only
+        InitializePlayerProperties();
+
         // Setup camera
         SetupCamera();
 
         // Spawn player
         SpawnPlayer();
+    }
+
+    private void InitializePlayerProperties()
+    {
+        // Set initial score for THIS player only using Photon's custom properties
+        Hashtable initialProps = new Hashtable();
+        initialProps["Score"] = 0;
+        initialProps["ItemsCount"] = 0;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(initialProps);
+
+        Debug.Log($"Initialized properties for player: {PhotonNetwork.LocalPlayer.NickName}");
     }
 
     private void SetupCamera()
@@ -102,6 +116,7 @@ public class GameManager : MonoBehaviourPunCallbacks
                 if (player.GetComponent<PhotonView>().IsMine)
                 {
                     SetupPlayerCamera(player);
+                    UpdateUI();
                 }
             }
             else
@@ -147,41 +162,90 @@ public class GameManager : MonoBehaviourPunCallbacks
         }
     }
 
-    // Your original methods - MAKE SURE THESE EXIST AND ARE PUBLIC
-    public void AddScore(int points)
+    // SIMPLE: Just update the score using Photon's custom properties
+    public void AddScore(int points, string itemName = "")
     {
-        totalScore += points;
-        UpdateUI();
+        if (!PhotonNetwork.LocalPlayer.IsLocal) return;
 
-        // Optional: Sync score across network if needed
-        if (PhotonNetwork.InRoom)
-        {
-            Debug.Log($"Score updated: {totalScore}");
-        }
-    }
+        // Get current score from custom properties
+        int currentScore = PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey("Score") ?
+            (int)PhotonNetwork.LocalPlayer.CustomProperties["Score"] : 0;
 
-    public void AddCollectedItem(string itemName)
-    {
-        collectedItems.Add(itemName);
-        UpdateUI();
+        int currentItems = PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey("ItemsCount") ?
+            (int)PhotonNetwork.LocalPlayer.CustomProperties["ItemsCount"] : 0;
 
-        // Optional: Sync collected items across network if needed
-        if (PhotonNetwork.InRoom)
-        {
-            Debug.Log($"Item collected: {itemName}");
-        }
+        // Update values
+        currentScore += points;
+        currentItems += 1;
+
+        // Update custom properties
+        Hashtable props = new Hashtable();
+        props["Score"] = currentScore;
+        props["ItemsCount"] = currentItems;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+
+        Debug.Log($"{PhotonNetwork.LocalPlayer.NickName} score: {currentScore}, items: {currentItems}");
     }
 
     private void UpdateUI()
     {
+        if (!PhotonNetwork.LocalPlayer.IsLocal) return;
+
+        // Get values from custom properties
+        int currentScore = PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey("Score") ?
+            (int)PhotonNetwork.LocalPlayer.CustomProperties["Score"] : 0;
+
+        int currentItems = PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey("ItemsCount") ?
+            (int)PhotonNetwork.LocalPlayer.CustomProperties["ItemsCount"] : 0;
+
         if (scoreText != null)
         {
-            scoreText.text = $"Score: {totalScore}";
+            scoreText.text = $"Score: {currentScore}";
         }
 
         if (itemsText != null)
         {
-            itemsText.text = $"Items: {collectedItems.Count}";
+            itemsText.text = $"Items: {currentItems}";
+        }
+    }
+
+    private void UpdateScoreboard()
+    {
+        if (scoreboardText != null && PhotonNetwork.InRoom)
+        {
+            string scoreboard = "SCOREBOARD:\n";
+
+            foreach (Player player in PhotonNetwork.PlayerList)
+            {
+                int playerScore = player.CustomProperties.ContainsKey("Score") ?
+                    (int)player.CustomProperties["Score"] : 0;
+
+                int playerItems = player.CustomProperties.ContainsKey("ItemsCount") ?
+                    (int)player.CustomProperties["ItemsCount"] : 0;
+
+                if (player.IsLocal)
+                {
+                    scoreboard += $"<b>{player.NickName} (You): {playerScore} pts, {playerItems} items</b>\n";
+                }
+                else
+                {
+                    scoreboard += $"{player.NickName}: {playerScore} pts, {playerItems} items\n";
+                }
+            }
+
+            scoreboardText.text = scoreboard;
+        }
+    }
+
+    public void ToggleScoreboard()
+    {
+        if (scoreboardPanel != null)
+        {
+            scoreboardPanel.SetActive(!scoreboardPanel.activeSelf);
+            if (scoreboardPanel.activeSelf)
+            {
+                UpdateScoreboard();
+            }
         }
     }
 
@@ -190,8 +254,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("GameManager: Joined room successfully");
 
-        // If we're already in the game scene, setup multiplayer
-        if (SceneManager.GetActiveScene().name == "GameScene") // Replace with your game scene name
+        if (SceneManager.GetActiveScene().name == "GameScene")
         {
             SetupMultiplayer();
         }
@@ -200,24 +263,40 @@ public class GameManager : MonoBehaviourPunCallbacks
     public override void OnLeftRoom()
     {
         Debug.Log("Left room, returning to lobby...");
-
-        // Clear game data when leaving room
-        totalScore = 0;
-        collectedItems.Clear();
-        UpdateUI();
-
-        // Load lobby scene
-        SceneManager.LoadScene("Lobby"); // Replace with your lobby scene name
+        SceneManager.LoadScene("Lobby");
     }
 
-    // Handle scene changes
-    private void OnEnable()
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
+        // When any player updates their score, refresh the UI and scoreboard
+        if (targetPlayer.IsLocal)
+        {
+            UpdateUI();
+        }
+        UpdateScoreboard();
+    }
+
+    public override void OnPlayerEnteredRoom(Player newPlayer)
+    {
+        Debug.Log($"Player joined: {newPlayer.NickName}");
+        UpdateScoreboard();
+    }
+
+    public override void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        Debug.Log($"Player left: {otherPlayer.NickName}");
+        UpdateScoreboard();
+    }
+
+    public override void OnEnable()
+    {
+        base.OnEnable();
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    private void OnDisable()
+    public override void OnDisable()
     {
+        base.OnDisable();
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
@@ -225,28 +304,27 @@ public class GameManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"Scene loaded: {scene.name}");
 
-        // Re-find UI references when new scene loads
         FindUIReferences();
-
-        // Update UI with current data
         UpdateUI();
+        UpdateScoreboard();
 
-        // Setup multiplayer if we're in a game scene and in a room
-        if (PhotonNetwork.InRoom && scene.name == "GameScene") // Replace with your game scene name
+        if (PhotonNetwork.InRoom && scene.name == "GameScene")
         {
-            // Small delay to ensure scene is fully loaded
             Invoke(nameof(SetupMultiplayer), 0.1f);
         }
     }
 
     private void FindUIReferences()
     {
-        // Find UI elements in the current scene
-        GameObject scoreObj = GameObject.Find("ScoreText"); // Replace with your UI element names
+        GameObject scoreObj = GameObject.Find("ScoreText");
         GameObject itemsObj = GameObject.Find("ItemsText");
+        GameObject scoreboardObj = GameObject.Find("ScoreboardPanel");
+        GameObject scoreboardTextObj = GameObject.Find("ScoreboardText");
 
         if (scoreObj != null) scoreText = scoreObj.GetComponent<Text>();
         if (itemsObj != null) itemsText = itemsObj.GetComponent<Text>();
+        if (scoreboardObj != null) scoreboardPanel = scoreboardObj;
+        if (scoreboardTextObj != null) scoreboardText = scoreboardTextObj.GetComponent<Text>();
 
         Debug.Log($"UI References - Score: {scoreText != null}, Items: {itemsText != null}");
     }
@@ -254,18 +332,9 @@ public class GameManager : MonoBehaviourPunCallbacks
     // Debug method for testing
     private void Update()
     {
-        // Press R to respawn (for testing)
-        if (Input.GetKeyDown(KeyCode.R) && PhotonNetwork.InRoom)
+        if (Input.GetKeyDown(KeyCode.Tab))
         {
-            Debug.Log("Manual respawn triggered");
-            SpawnPlayer();
-        }
-
-        // Press T to test score (for testing)
-        if (Input.GetKeyDown(KeyCode.T))
-        {
-            AddScore(10);
-            AddCollectedItem("TestItem");
+            ToggleScoreboard();
         }
     }
 }

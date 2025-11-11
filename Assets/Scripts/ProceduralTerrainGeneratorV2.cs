@@ -140,7 +140,17 @@ public class ProceduralTerrainGeneratorV2 : MonoBehaviour
                 float mask = Mathf.Clamp01(1f - Mathf.Pow(distance / maxDistance, edgeFalloff));
 
                 // Combine noise + island mask
-                heights[x, y] = noiseValue * mask;
+                //heights[x, y] = noiseValue * mask;
+
+                // Combine noise + island mask
+                float rawHeight = noiseValue * mask;
+
+                // Quantize (snap) height to fixed levels
+                float step = 0.5f; // height intervals (0, 0.5, 1)
+                float quantized = Mathf.Round(rawHeight / step) * step;
+
+                heights[x, y] = quantized;
+
             }
         }
 

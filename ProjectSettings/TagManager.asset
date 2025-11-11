@@ -7,6 +7,7 @@ TagManager:
   - Land
   - RecycleBin
   - Collectable
+  - Book
   layers:
   - Default
   - TransparentFX

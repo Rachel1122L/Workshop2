@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
-using System.Collections.Generic;
 using Photon.Pun;
 
 public class BoatCollector : MonoBehaviourPunCallbacks
@@ -9,22 +8,16 @@ public class BoatCollector : MonoBehaviourPunCallbacks
     [Header("Collection Settings")]
     public float collectionRange = 3f;
     public KeyCode collectKey = KeyCode.E;
-    public KeyCode dropKey = KeyCode.Q;
 
     [Header("UI References")]
     public GameObject collectPromptUI;
     public Text collectPromptText;
-    public Text inventoryText;
     public AudioClip collectSound;
-    public AudioClip dropSound;
 
-    [Header("Inventory")]
-    public List<CollectableItem> trashInventory = new List<CollectableItem>();
-    public int maxInventorySize = 5;
+    [Header("Manual Detection")]
+    public LayerMask collectableLayerMask = 1 << 0; // Default layer
 
-    public CollectableItem nearbyCollectable;
-    public bool nearRecycleBin = false;
-    private GameObject currentRecycleBin;
+    private CollectableItem nearbyCollectable;
     private AudioSource audioSource;
     private bool isInitialized = false;
 
@@ -34,6 +27,7 @@ public class BoatCollector : MonoBehaviourPunCallbacks
         if (audioSource == null)
         {
             audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.spatialBlend = 1f; // 3D sound
         }
 
         if (collectPromptUI != null)
@@ -41,316 +35,107 @@ public class BoatCollector : MonoBehaviourPunCallbacks
             collectPromptUI.SetActive(false);
         }
 
-        UpdateInventoryUI();
         isInitialized = true;
+        Debug.Log($"BoatCollector initialized. IsMine: {photonView.IsMine}, ViewID: {photonView.ViewID}");
     }
 
     void Update()
     {
-        if (!photonView.IsMine) return;
-
-        // Collect trash
-        if (Input.GetKeyDown(collectKey) && nearbyCollectable != null)
+        // Only local player can collect items
+        if (!photonView.IsMine)
         {
+            return;
+        }
+
+        // Manual detection every frame
+        FindNearbyCollectables();
+
+        if (Input.GetKeyDown(collectKey) && nearbyCollectable != null && !nearbyCollectable.IsCollected)
+        {
+            Debug.Log($"Collect key pressed. Nearby collectable: {nearbyCollectable.itemName}");
             CollectItem();
         }
 
-        // Drop trash at recycle bin
-        if (Input.GetKeyDown(dropKey) && nearRecycleBin && trashInventory.Count > 0)
-        {
-            DropTrashAtRecycleBin();
-        }
-
         UpdateCollectPrompt();
-        UpdateInventoryUI();
     }
 
-    public void SetNearbyCollectable(CollectableItem collectable)
+    private void FindNearbyCollectables()
     {
-        if (collectable != null && !collectable.IsCollected && nearbyCollectable != collectable)
-        {
-            nearbyCollectable = collectable;
-        }
-    }
-
-    public void ClearNearbyCollectable(CollectableItem collectable)
-    {
-        if (nearbyCollectable == collectable)
-        {
-            nearbyCollectable = null;
-            if (collectPromptUI != null)
-            {
-                collectPromptUI.SetActive(false);
-            }
-        }
-    }
-
-    private void CollectItem()
-    {
-        if (nearbyCollectable != null && !nearbyCollectable.IsCollected && trashInventory.Count < maxInventorySize)
-        {
-            // Play sound
-            if (collectSound != null && audioSource != null)
-            {
-                audioSource.PlayOneShot(collectSound);
-            }
-
-            // Add to inventory instead of destroying
-            CollectableItem collectedItem = nearbyCollectable;
-            trashInventory.Add(collectedItem);
-
-            // Hide the collected item but don't destroy it
-            collectedItem.gameObject.SetActive(false);
-            collectedItem.IsCollected = true;
-
-            // Clear reference and hide prompt
-            nearbyCollectable = null;
-
-            if (collectPromptUI != null)
-            {
-                collectPromptUI.SetActive(false);
-            }
-
-            Debug.Log($"Collected: {collectedItem.itemName} - Inventory: {trashInventory.Count}/{maxInventorySize}");
-        }
-    }
-
-    private void DropTrashAtRecycleBin()
-    {
-        if (trashInventory.Count > 0 && currentRecycleBin != null)
-        {
-            // Play drop sound
-            if (dropSound != null && audioSource != null)
-            {
-                audioSource.PlayOneShot(dropSound);
-            }
-
-            // Get the last collected trash
-            CollectableItem trashToDrop = trashInventory[trashInventory.Count - 1];
-            trashInventory.RemoveAt(trashInventory.Count - 1);
-
-            // Show the trash at recycle bin position
-            trashToDrop.gameObject.SetActive(true);
-            Vector3 dropPosition = currentRecycleBin.transform.position +
-                                 Vector3.up * 1.5f +
-                                 Random.insideUnitSphere * 0.5f;
-            trashToDrop.transform.position = dropPosition;
-
-            // Reset collected state
-            trashToDrop.IsCollected = false;
-
-            Debug.Log($"Dropped {trashToDrop.itemName} at recycle bin - Inventory: {trashInventory.Count}/{maxInventorySize}");
-        }
-    }
-
-    private void UpdateCollectPrompt()
-    {
-        if (collectPromptUI != null && isInitialized)
-        {
-            bool showPrompt = nearbyCollectable != null &&
-                            !nearbyCollectable.IsCollected &&
-                            IsCollectableInRange(nearbyCollectable) &&
-                            trashInventory.Count < maxInventorySize;
-
-            collectPromptUI.SetActive(showPrompt);
-
-            if (showPrompt && collectPromptText != null)
-            {
-                collectPromptText.text = $"Press {collectKey} to collect {nearbyCollectable.itemName}";
-            }
-        }
-    }
-
-    private void UpdateInventoryUI()
-    {
-        if (inventoryText != null)
-        {
-            inventoryText.text = $"Trash: {trashInventory.Count}/{maxInventorySize}";
-
-            // Show drop hint when near recycle bin
-            if (nearRecycleBin && trashInventory.Count > 0)
-            {
-                inventoryText.text += $"\nPress {dropKey} to drop at recycle bin";
-            }
-        }
-    }
-
-    private bool IsCollectableInRange(CollectableItem collectable)
-    {
-        if (collectable == null) return false;
-        float distance = Vector3.Distance(transform.position, collectable.transform.position);
-        return distance <= collectionRange;
-    }
-
-    // Recycle Bin Detection
-    void OnTriggerEnter(Collider other)
-    {
-        if (!photonView.IsMine) return;
-
-        if (other.CompareTag("RecycleBin"))
-        {
-            nearRecycleBin = true;
-            currentRecycleBin = other.gameObject;
-            Debug.Log("Near recycle bin - ready to drop trash");
-        }
-
-        if (other.CompareTag("Collectable"))
-        {
-            CollectableItem collectable = other.GetComponent<CollectableItem>();
-            if (collectable != null && !collectable.IsCollected)
-            {
-                SetNearbyCollectable(collectable);
-            }
-        }
-    }
-
-    void OnTriggerExit(Collider other)
-    {
-        if (!photonView.IsMine) return;
-
-        if (other.CompareTag("RecycleBin"))
-        {
-            nearRecycleBin = false;
-            currentRecycleBin = null;
-            Debug.Log("Left recycle bin area");
-        }
-
-        if (other.CompareTag("Collectable"))
-        {
-            CollectableItem collectable = other.GetComponent<CollectableItem>();
-            if (collectable != null)
-            {
-                ClearNearbyCollectable(collectable);
-            }
-        }
-    }
-
-    void FixedUpdate()
-    {
-        if (!photonView.IsMine) return;
-        CheckForCollectablesWithOverlap();
-    }
-
-    private void CheckForCollectablesWithOverlap()
-    {
-        if (nearbyCollectable != null)
-        {
-            if (nearbyCollectable == null ||
-                nearbyCollectable.IsCollected ||
-                !IsCollectableInRange(nearbyCollectable))
-            {
-                ClearNearbyCollectable(nearbyCollectable);
-                return;
-            }
-        }
-
-        if (nearbyCollectable == null)
-        {
-            FindNewCollectables();
-        }
-    }
-
-    private void FindNewCollectables()
-    {
-        Collider[] hitColliders = Physics.OverlapSphere(transform.position, collectionRange);
         CollectableItem closestCollectable = null;
         float closestDistance = Mathf.Infinity;
 
+        Collider[] hitColliders = Physics.OverlapSphere(transform.position, collectionRange, collectableLayerMask);
+
         foreach (var hitCollider in hitColliders)
         {
-            if (hitCollider.CompareTag("Collectable"))
+            CollectableItem collectable = hitCollider.GetComponent<CollectableItem>();
+            if (collectable != null && !collectable.IsCollected)
             {
-                CollectableItem collectable = hitCollider.GetComponent<CollectableItem>();
-                if (collectable != null && !collectable.IsCollected)
+                float distance = Vector3.Distance(transform.position, collectable.transform.position);
+                if (distance <= collectionRange && distance < closestDistance)
                 {
-                    float distance = Vector3.Distance(transform.position, collectable.transform.position);
-                    if (distance < closestDistance && distance <= collectionRange)
-                    {
-                        closestCollectable = collectable;
-                        closestDistance = distance;
-                    }
+                    closestCollectable = collectable;
+                    closestDistance = distance;
                 }
             }
         }
 
-        if (closestCollectable != null)
+        // Only update if we found a new closest collectable
+        if (closestCollectable != null && closestCollectable != nearbyCollectable)
         {
+            Debug.Log($"Found collectable: {closestCollectable.itemName} at distance: {closestDistance:F2}");
             SetNearbyCollectable(closestCollectable);
         }
-    }
-
-    void OnDestroy()
-    {
-        if (collectPromptUI != null)
+        else if (closestCollectable == null && nearbyCollectable != null)
         {
-            collectPromptUI.SetActive(false);
+            // Clear if no collectables in range
+            ClearNearbyCollectable(nearbyCollectable);
         }
     }
 
-    void OnDrawGizmosSelected()
+    private void CollectItem()
     {
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireSphere(transform.position, collectionRange);
-    }
-}
-
-// Original Code//
-/*using UnityEngine;
-using UnityEngine.UI;
-using System.Collections;
-
-public class BoatCollector : MonoBehaviour
-{
-    [Header("Collection Settings")]
-    public float collectionRange = 3f;
-    public KeyCode collectKey = KeyCode.E;
-
-    [Header("UI References")]
-    public GameObject collectPromptUI;
-    public Text collectPromptText;
-    public AudioClip collectSound;
-
-    public CollectableItem nearbyCollectable;
-    private AudioSource audioSource;
-    private bool isInitialized = false;
-
-    void Start()
-    {
-        // Get or add AudioSource
-        audioSource = GetComponent<AudioSource>();
-        if (audioSource == null)
+        // Only local player can collect items
+        if (!photonView.IsMine)
         {
-            audioSource = gameObject.AddComponent<AudioSource>();
+            Debug.Log("Not local player, cannot collect");
+            return;
         }
 
-        // Hide prompt initially
-        if (collectPromptUI != null)
+        if (nearbyCollectable != null && !nearbyCollectable.IsCollected)
         {
-            collectPromptUI.SetActive(false);
+            Debug.Log($"Collect key pressed. Nearby collectable: {nearbyCollectable.itemName}");
+
+            // Play sound locally
+            if (collectSound != null && audioSource != null)
+            {
+                audioSource.PlayOneShot(collectSound);
+            }
+
+            // This will handle network collection
+            nearbyCollectable.Collect();
+
+            // Clear reference immediately
+            ClearNearbyCollectable(nearbyCollectable);
+
+            // Hide prompt immediately
+            if (collectPromptUI != null)
+            {
+                collectPromptUI.SetActive(false);
+            }
         }
-
-        isInitialized = true;
-    }
-
-    void Update()
-    {
-        // Check for collection input
-        if (Input.GetKeyDown(collectKey) && nearbyCollectable != null)
+        else
         {
-            CollectItem();
+            Debug.Log($"Cannot collect - nearbyCollectable is null or already collected");
         }
-
-        // Update UI prompt
-        UpdateCollectPrompt();
     }
 
     public void SetNearbyCollectable(CollectableItem collectable)
     {
-        // Only set if not already collected and not already the current collectable
         if (collectable != null && !collectable.IsCollected && nearbyCollectable != collectable)
         {
             nearbyCollectable = collectable;
-            Debug.Log($"Nearby collectable set: {collectable.itemName}");
+            Debug.Log($"Nearby collectable set: {collectable.itemName}. Distance: {Vector3.Distance(transform.position, collectable.transform.position):F2}");
         }
     }
 
@@ -358,41 +143,12 @@ public class BoatCollector : MonoBehaviour
     {
         if (nearbyCollectable == collectable)
         {
+            Debug.Log($"Clearing nearby collectable: {collectable?.itemName}");
             nearbyCollectable = null;
-            Debug.Log($"Nearby collectable cleared: {collectable.itemName}");
-
-            // Immediately hide prompt when clearing
             if (collectPromptUI != null)
             {
                 collectPromptUI.SetActive(false);
             }
-        }
-    }
-
-    private void CollectItem()
-    {
-        if (nearbyCollectable != null && !nearbyCollectable.IsCollected)
-        {
-            // Play sound
-            if (collectSound != null && audioSource != null)
-            {
-                audioSource.PlayOneShot(collectSound);
-            }
-
-            // Collect the item
-            nearbyCollectable.Collect();
-
-            // Clear reference and hide prompt
-            CollectableItem collectedItem = nearbyCollectable;
-            nearbyCollectable = null;
-
-            // Hide prompt immediately after collection
-            if (collectPromptUI != null)
-            {
-                collectPromptUI.SetActive(false);
-            }
-
-            Debug.Log($"Collected: {collectedItem.itemName}");
         }
     }
 
@@ -408,7 +164,8 @@ public class BoatCollector : MonoBehaviour
 
             if (showPrompt && collectPromptText != null)
             {
-                collectPromptText.text = $"Press {collectKey} to collect {nearbyCollectable.itemName}";
+                float distance = Vector3.Distance(transform.position, nearbyCollectable.transform.position);
+                collectPromptText.text = $"Press {collectKey} to collect {nearbyCollectable.itemName} ({distance:F1}m)";
             }
         }
     }
@@ -416,66 +173,29 @@ public class BoatCollector : MonoBehaviour
     private bool IsCollectableInRange(CollectableItem collectable)
     {
         if (collectable == null) return false;
-
         float distance = Vector3.Distance(transform.position, collectable.transform.position);
-        return distance <= collectionRange;
+        bool inRange = distance <= collectionRange;
+
+        if (!inRange && nearbyCollectable == collectable)
+        {
+            Debug.Log($"Collectable {collectable.itemName} out of range: {distance:F2} > {collectionRange}");
+            ClearNearbyCollectable(collectable);
+        }
+
+        return inRange;
     }
 
     void FixedUpdate()
     {
-        // This backup system should check if we lost our current collectable
-        CheckForCollectablesWithOverlap();
-    }
+        if (!photonView.IsMine) return;
 
-    private void CheckForCollectablesWithOverlap()
-    {
-        // If we have a current collectable, verify it's still in range and valid
-        if (nearbyCollectable != null)
+        // Additional validation for current nearby collectable
+        if (nearbyCollectable != null && (!IsCollectableInRange(nearbyCollectable) || nearbyCollectable.IsCollected))
         {
-            // Check if collectable was destroyed, collected, or out of range
-            if (nearbyCollectable == null ||
-                nearbyCollectable.IsCollected ||
-                !IsCollectableInRange(nearbyCollectable))
-            {
-                ClearNearbyCollectable(nearbyCollectable);
-                return; // Don't look for new ones immediately
-            }
-        }
-
-        // Only look for new collectables if we don't have a current valid one
-        if (nearbyCollectable == null)
-        {
-            FindNewCollectables();
+            ClearNearbyCollectable(nearbyCollectable);
         }
     }
 
-    private void FindNewCollectables()
-    {
-        Collider[] hitColliders = Physics.OverlapSphere(transform.position, collectionRange);
-        CollectableItem closestCollectable = null;
-        float closestDistance = Mathf.Infinity;
-
-        foreach (var hitCollider in hitColliders)
-        {
-            CollectableItem collectable = hitCollider.GetComponent<CollectableItem>();
-            if (collectable != null && !collectable.IsCollected)
-            {
-                float distance = Vector3.Distance(transform.position, collectable.transform.position);
-                if (distance < closestDistance && distance <= collectionRange)
-                {
-                    closestCollectable = collectable;
-                    closestDistance = distance;
-                }
-            }
-        }
-
-        if (closestCollectable != null)
-        {
-            SetNearbyCollectable(closestCollectable);
-        }
-    }
-
-    // Handle cases where collectable is destroyed without triggering collision
     void OnDestroy()
     {
         if (collectPromptUI != null)
@@ -484,11 +204,34 @@ public class BoatCollector : MonoBehaviour
         }
     }
 
-    // Visualize collection range in editor
+    void OnGUI()
+    {
+        if (photonView.IsMine)
+        {
+            GUI.Label(new Rect(10, 10, 400, 20), $"Nearby Collectable: {(nearbyCollectable != null ? nearbyCollectable.itemName : "None")}");
+            GUI.Label(new Rect(10, 30, 400, 20), $"Distance: {(nearbyCollectable != null ? Vector3.Distance(transform.position, nearbyCollectable.transform.position).ToString("F2") : "N/A")}");
+            GUI.Label(new Rect(10, 50, 400, 20), $"Is Collected: {(nearbyCollectable != null ? nearbyCollectable.IsCollected.ToString() : "N/A")}");
+            GUI.Label(new Rect(10, 70, 400, 20), $"Range: {collectionRange}");
+            GUI.Label(new Rect(10, 90, 400, 20), $"Boat ViewID: {photonView.ViewID}");
+        }
+    }
+
     void OnDrawGizmosSelected()
     {
+        // Collection range
         Gizmos.color = Color.blue;
         Gizmos.DrawWireSphere(transform.position, collectionRange);
+
+        // Line to nearby collectable
+        if (nearbyCollectable != null && !nearbyCollectable.IsCollected)
+        {
+            float distance = Vector3.Distance(transform.position, nearbyCollectable.transform.position);
+            Gizmos.color = distance <= collectionRange ? Color.green : Color.yellow;
+            Gizmos.DrawLine(transform.position, nearbyCollectable.transform.position);
+
+            // Draw sphere at collectable position
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(nearbyCollectable.transform.position, 0.3f);
+        }
     }
 }
-*/
